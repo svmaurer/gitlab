@@ -1,0 +1,30 @@
+#!/bin/bash
+
+function sigterm_handler() {
+        echo "SIGTERM signal received, try to gracefully shutdown all services..."
+        gitlab-ctl stop
+}
+trap "sigterm_handler; exit" TERM
+
+# Copy gitlab.rb for the first time
+if [[ ! -e /etc/gitlab/gitlab.rb ]]; then
+	echo "Installing gitlab.rb config..."
+	cp /assets/gitlab.rb /etc/gitlab/gitlab.rb
+	chmod 0666 /etc/gitlab/gitlab.rb
+fi
+
+# Generate ssh host key for the first time
+if [[ ! -f /etc/gitlab/ssh_host_rsa_key ]]; then
+	echo "Generating ssh_host_rsa_key..."
+	ssh-keygen -f /etc/gitlab/ssh_host_rsa_key -N '' -t rsa
+	chmod 0600 /etc/gitlab/ssh_host_rsa_key
+fi
+
+
+function entrypoint() {
+        /opt/gitlab/embedded/bin/runsvdir-start &
+        gitlab-ctl reconfigure # will also start everything
+        gitlab-ctl tail # tail all logs
+}
+
+entrypoint
